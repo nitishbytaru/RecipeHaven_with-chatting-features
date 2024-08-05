@@ -1,0 +1,105 @@
+{% extends "layout.html" %} {% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card bg-dark text-white border-light shadow-lg">
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-4">
+            <p class="card-title text-center">
+              Chat with: {{ other_user.username }}
+            </p>
+            <a href="{% url "delete_room" room_name %}" class="btn btn-danger">Delete Chat</a>
+          </div>
+          <div
+            class="chat-log mb-3"
+            id="chat-log"
+            style="height: 400px; overflow-y: auto"
+          >
+            {% for message in messages %}
+            <div
+              class="message {% if message.sender == user %}text-right{% endif %}"
+            >
+              <p
+                class="mb-1 text-black {% if message.sender == user %}bg-primary text-white p-2 rounded{% else %}bg-light p-2 rounded{% endif %}"
+              >
+                {{ message.message }} <strong>-{{ message.sender }}</strong>
+              </p>
+            </div>
+            {% endfor %}
+          </div>
+          <form id="message-form" method="POST" class="form-inline">
+            {% csrf_token %}
+            <div class="form-group mr-2 w-75">
+              <textarea
+                id="msg"
+                name="message"
+                class="form-control w-100"
+                rows="2"
+                placeholder="Enter your message"
+                required
+              ></textarea>
+            </div>
+            <button class="btn btn-primary" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  function scrollToBottom() {
+    var chatLog = document.getElementById("chat-log");
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  const websocketProtocol =
+    window.location.protocol === "https:" ? "wss" : "ws";
+  const wsEndpoint = `${websocketProtocol}://${window.location.host}/ws/chat/{{ room_name }}/`;
+
+  const socket = new WebSocket(wsEndpoint);
+
+  socket.onopen = function (event) {
+    console.log("WebSocket connection opened!");
+  };
+
+  socket.onclose = function (event) {
+    console.log("WebSocket connection closed!");
+  };
+
+  document
+    .getElementById("message-form")
+    .addEventListener("submit", function (event) {
+      event.preventDefault();
+      const message = document.getElementById("msg").value;
+      socket.send(
+        JSON.stringify({
+          message: message,
+          room_name: "{{ room_name }}",
+          sender: "{{ user.username }}",
+        })
+      );
+      document.getElementById("msg").value = "";
+    });
+
+  socket.addEventListener("message", function (event) {
+    const messageData = JSON.parse(event.data);
+    const sender = messageData.sender;
+    const message = messageData.message;
+
+    const messageDiv = document.createElement("div");
+    messageDiv.className = `message ${
+      sender === "{{ user.username }}" ? "text-right text-black" : "text-black"
+    }`;
+    messageDiv.innerHTML = `<p class="mb-1 ${
+      sender === "{{ user.username }}"
+        ? "bg-primary text-white p-2 rounded"
+        : "bg-light p-2 rounded"
+    }">
+                                ${message} <strong>-${sender}</strong>
+                                </p>`;
+
+    document.getElementById("chat-log").appendChild(messageDiv);
+    scrollToBottom();
+  });
+</script>
+{% endblock %}
